@@ -3,7 +3,7 @@ function params = initParams()
 % Output: params struct containing fs, Nfft, Ncp, M_sym, modulation order, SNR, etc.
 
 %% --- Baseband parameters ---
-params.fs = 1e6;        % Baseband sampling rate (1 MHz) for light simulation
+params.fs = 8e6;        % Baseband sampling rate (1 MHz) for light simulation
 % Note: fs must be enough for subcarrier spacing = fs/Nfft. Very high fs causes memory issues.
 
 params.Nfft = 256;      % Number of subcarriers (FFT size)
