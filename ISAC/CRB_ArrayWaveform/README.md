@@ -405,10 +405,10 @@ original paper and, separately, this repository.
 
 ```bibtex
 @software{crb_array_waveform_matlab_repro,
-  author  = {[Your Name]},
+  author  = {Ali ArabiBavil},
   title   = {CRB-Optimal Arrays and Waveforms for Multi-Target Active Sensing: An Independent MATLAB Reproduction},
-  year    = {[Year]},
-  url     = {[repository-url]},
+  year    = {2026},
+  url     = {https://github.com/AliArabi2022/6G/edit/master/ISAC/CRB_ArrayWaveform},
   note    = {Independent MATLAB implementation of van der Werf and Leus (2025)}
 }
 ```
