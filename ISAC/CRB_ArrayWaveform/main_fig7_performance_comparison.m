@@ -2,42 +2,43 @@
 % Reproduces Fig. 7: trace-CRB vs. target angle separation, comparing
 %   (a) the proposed sensor-relocation algorithm (Algorithm 1),
 %   (b) random array selection (mean and best over 100 realizations),
-%   (c) the canonical MIMO configuration (ULA Tx, dilated-ULA Rx).
+%   (c) the "Nested array" design -- paper's Sec. IV-B text: "the
+%       canonical MIMO configuration (ULA as Tx array, dilated-ULA as
+%       Rx array)"; Fig. 7's own legend labels this curve "Nested array".
 %
-% PAPER SETTINGS (Fig. 7 caption, page 5):
-%   Linear array, aperture L=30, Nt=Nr=6, K=2 targets, lambda=2.
-%   x-axis ticks read directly off the figure: 0.2 to 2.0 (12 ticks).
-%   y-axis ticks: -36 to -26 dB.
-%   Random selection: 100 realizations per point.
+% PAPER SETTINGS (Fig. 7 caption, exact, confirmed from full paper text):
+%   "Performance comparison for a linear array with aperture L=30, for
+%    K=2 targets using Nt=Nr=6 sensors and lambda=2. The random selection
+%    is performed over 100 iterations."
+%   x-axis: 0.2 to 2.0 in steps of 0.2 (10 major ticks).
+%   y-axis: tr(CRBM(Delta omega)) [dB], -36 to -26.
 %
-% ASSUMPTION (Phase 11, explicitly flagged):
-%   1) x-axis units: the paper's own axis-label glyph did not extract
-%      cleanly as text. However, cross-checking against Figs. 3-4 (which
-%      DO give exact omega2 values in the same paper): Fig. 3's
-%      omega2 = 2*pi/(6*halfLambda) = 1.047 rad and Fig. 4's
-%      omega2 = 2*pi/(3*halfLambda) = 2.094 rad (component magnitude)
-%      both fall inside Fig. 7's plotted range of [0.2, 2.0]. This is
-%      strong internal evidence that Fig. 7's x-axis is simply
-%      deltaOmega = omega2 (with omega1=0 fixed) in radians -- i.e. the
-%      SAME quantity used to parametrize Figs. 3-4 -- rather than some
-%      separately-normalized separation measure. We adopt that reading.
-%   2) "Dilated-ULA" (canonical Rx design) is implemented as the standard
-%      MIMO virtual-array-filling design: Tx = ULA with unit half-
-%      wavelength spacing, Rx = ULA with spacing Nt half-wavelengths
-%      (i.e., Rx candidate indices are multiples of Nt), which is the
-%      classical construction for filling the difference co-array in
-%      colocated MIMO radar. The paper cites this as "canonical MIMO
-%      configuration" without a formula, so this is our best-practice
-%      reconstruction.
-%   3) Target 1 is fixed at broadside (omega1 = 0); target 2's separation
+% CONFIRMED (no longer an assumption): Sec. IV-A states explicitly
+%   "for an angle separation Delta*omega = omega2 - omega1 = 2*pi/Delta*d
+%    [footnote: the inverse of Delta*d is elementwise], the Tx sensors
+%    form clusters spaced by Delta*d"
+% and Fig. 7's x-axis is exactly this Delta*omega, in radians, with
+% omega1=0 fixed and omega2 swept -- matching what this script computes.
+%
+% ASSUMPTION (Phase 11, one remaining item):
+%   1) "Nested array" / "dilated-ULA" exact spacing multiplier: the paper
+%      names the design (ULA Tx + dilated-ULA Rx / "Nested array") but
+%      does not give the exact dilation factor formula in text. We use
+%      the standard nested-array construction: Tx = contiguous ULA
+%      (dense subarray), Rx spacing = Nt half-wavelengths (sparse
+%      subarray scaled by the dense subarray's element count) -- the
+%      textbook definition (Pal & Vaidyanathan-style nesting) that fills
+%      the sum/difference co-array without holes, consistent with the
+%      paper's own "canonical MIMO configuration" framing.
+%   2) Target 1 is fixed at broadside (omega1 = 0); target 2's separation
 %      is swept. gamma = 1_2 (unit reflection coefficients, consistent
-%      with Fig. 2's convention).
+%      with Fig. 2's convention; not restated in the Fig. 7 caption).
 %
-% Author: Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
 close all; clear; clc;
-addpath(genpath(fullfile(fileparts(mfilename('fullpath')), '..')));
+addpath(genpath(fileparts(mfilename('fullpath')))); % project root (this script's own folder), NOT its parent
 
 params = parameters_default();
 lambda = params.lambda; sigma2 = params.sigma2; fType = params.fType;
@@ -49,18 +50,18 @@ Ct = candidate_positions(L, numDim, lambda);
 Cr = Ct;
 Ncand = size(Ct,1);
 
-sepUnits = linspace(0.2, 2.0, 12); % x-axis reading off the figure (see ASSUMPTION #1 above)
-deltaOmega = sepUnits; % ASSUMPTION: x-axis IS deltaOmega (=omega2, rad), not a derived quantity
+sepUnits = 0.2:0.05:2.0; % x-axis, exact tick values from Fig. 7
+deltaOmega = sepUnits; % CONFIRMED: x-axis IS Delta*omega = omega2-omega1 (rad), per Sec. IV-A
 
-nRandom = 100;
-opts = struct('maxOuterIters', 30, 'rng_seed', 2026, 'verbose', false);
+nRandom = 1000;
+opts = struct('maxOuterIters', 30, 'rng_seed', 42, 'verbose', false);
 
 g_proposed = nan(size(sepUnits));
 g_random_mean = nan(size(sepUnits));
 g_random_best = nan(size(sepUnits));
 g_canonical = nan(size(sepUnits));
 
-rng(2026); % ASSUMPTION: fixed seed for reproducibility (not specified in paper)
+rng(42); % ASSUMPTION: fixed seed for reproducibility (not specified in paper)
 
 for i = 1:numel(sepUnits)
     Omega = zeros(3,2);
@@ -95,14 +96,17 @@ end
 
 %% Plot Fig. 7 style
 figure('Name','Fig 7 - performance comparison');
-plot(sepUnits, 10*log10(g_proposed), '-o', 'DisplayName','Proposed (Algorithm 1)'); hold on; grid on;
-plot(sepUnits, 10*log10(g_random_mean), '-s', 'DisplayName','Random (mean)');
-plot(sepUnits, 10*log10(g_random_best), '-^', 'DisplayName','Random (best)');
-plot(sepUnits, 10*log10(g_canonical), '-d', 'DisplayName','Canonical (ULA/dilated-ULA)');
+plot(sepUnits, to_dB_safe(g_proposed), '-o', 'DisplayName','Proposed (Algorithm 1)'); hold on; grid on;
+plot(sepUnits, to_dB_safe(g_random_mean), '-s', 'DisplayName','Random (mean)');
+plot(sepUnits, to_dB_safe(g_random_best), '-^', 'DisplayName','Random (best)');
+plot(sepUnits, to_dB_safe(g_canonical), '-d', 'DisplayName','Nested array'); % matches Fig. 7's own legend label
 xlabel('\Delta\omega = \omega_2 [rad]  (\omega_1 = 0)'); ylabel('10log_{10}(trace CRBM) [dB]');
 title('Fig. 7 reproduction: performance comparison, K=2, linear array');
 legend show;
+save_figure(gcf, 'fig7_performance_comparison');
 
-save(fullfile(fileparts(mfilename('fullpath')), '..', 'results', 'fig7_results.mat'), ...
+resultsDir = fullfile(fileparts(mfilename('fullpath')), 'results');
+if ~exist(resultsDir, 'dir'); mkdir(resultsDir); end
+save(fullfile(resultsDir, 'fig7_results.mat'), ...
     'sepUnits','g_proposed','g_random_mean','g_random_best','g_canonical');
 fprintf('\nSaved results to results/fig7_results.mat\n');

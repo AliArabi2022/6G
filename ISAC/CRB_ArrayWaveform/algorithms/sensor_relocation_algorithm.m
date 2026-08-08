@@ -50,8 +50,8 @@ function [Dt, Dr, idxT, idxR, history] = sensor_relocation_algorithm(Ct, Cr, Nt,
 % tie-breaking when multiple candidates achieve the same minimal g (we
 % keep the first one found, i.e., MATLAB's default min() behavior).
 %
-% Author:Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     if nargin < 9 || isempty(fType); fType = 'trace'; end
     if nargin < 10; opts = struct(); end

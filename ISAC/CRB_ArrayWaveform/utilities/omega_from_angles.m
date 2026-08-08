@@ -26,8 +26,9 @@ function Omega = omega_from_angles(theta_deg, phi_deg, lambda, numDim)
 %   Omega - (3 x K) full 3D omega vectors (for array-manifold evaluation)
 %           Use omega_active_dims to get the (numDim x K) estimable slice.
 %
-% Author: Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
+
     if nargin < 3 || isempty(lambda)
         lambda = 2;
     end

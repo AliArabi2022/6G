@@ -27,8 +27,8 @@ function D = candidate_positions(L, numDim, lambda)
 %             Columns beyond numDim are zero (Remark 1: planar array =
 %             z-coordinate 0; linear array = y,z coordinates 0).
 %
-% Author: Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     if nargin < 3 || isempty(lambda)
         lambda = 2; % matches Fig. 7 caption: "lambda = 2"

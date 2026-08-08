@@ -25,8 +25,8 @@ function [CRBM_OO, obj] = compute_CRBM(Dt, Dr, Omega, gamma, Rs, sigma2, numDim,
 % negligible effect on well-posed configurations and is standard practice
 % not specific to this paper.
 %
-% Author: Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     if nargin < 8 || isempty(fType)
         fType = 'trace';

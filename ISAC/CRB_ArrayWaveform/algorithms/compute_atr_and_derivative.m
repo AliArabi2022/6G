@@ -27,8 +27,8 @@ function [Atr, Adot_tr, At, Ar] = compute_atr_and_derivative(Dt, Dr, Omega, numD
 %   At, Ar   - (Nt x K), (Nr x K) steering matrices (returned for reuse,
 %              e.g. eq. 14-16 optimal-waveform decomposition)
 %
-% Author:Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     K  = size(Omega, 2);
     Nt = size(Dt, 1);

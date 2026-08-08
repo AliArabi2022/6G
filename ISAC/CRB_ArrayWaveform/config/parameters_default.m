@@ -18,7 +18,7 @@ function params = parameters_default()
 % geometry of Algorithm 1, since g(Dt,Dr) is monotonic in sigma2 for
 % fixed geometry-independent scaling). We set sigma2 = 1 throughout.
 %
-% Author:Ali Arabi Bavil
+% Author: Ali ArabiBavil
 % Date: 2026-07-07
 
     params.lambda  = 2;      % Fig. 7 caption: "lambda = 2"

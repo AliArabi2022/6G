@@ -17,8 +17,9 @@ function A = array_manifold(D, Omega)
 % OUTPUT
 %   A     - (N x K) steering matrix, A(n,k) = exp(1j * D(n,:) * Omega(:,k))
 %
-% Author: Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
+
     if isempty(D)
         A = zeros(0, size(Omega,2));
         return;

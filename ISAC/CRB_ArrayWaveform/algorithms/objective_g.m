@@ -11,8 +11,8 @@ function [g, Rs] = objective_g(Dt, Dr, Omega, gamma, sigma2, numDim, fType)
 % INPUTS/OUTPUTS as in compute_CRBM.m; also returns the coherent-beam Rs
 % used, for reuse/inspection.
 %
-% Author:Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     if nargin < 7 || isempty(fType); fType = 'trace'; end
     At = array_manifold(Dt, Omega);

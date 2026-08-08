@@ -9,7 +9,16 @@ function F = compute_FIM(Atr, Adot_tr, Rs, Nr, gamma, sigma2, numDim, K)
 %
 %   F = (2/sigma2) * [ Re{F_OO}          Re{F_Og}        -Im{F_Og}  ;
 %                      Re{F_Og}^H        Re{F_gg}        -Im{F_gg}  ;
-%                      Im{F_Og}^H        Im{F_gg}^H        Re{F_gg} ]           (4)
+%                     -Im{F_Og}^T       -Im{F_gg}^T        Re{F_gg} ]           (4)
+%
+% IMPORTANT IDENTITY used below: for any complex matrix X,
+%   Im(X^H) = Im(conj(X)^T) = (-Im(X))^T = -imag(X)'   (since imag(X) is
+%   real, its conjugate-transpose ' equals its plain transpose).
+% The bottom-left blocks of (4) are Im{F_Og}^H and Im{F_gg}^H, which by
+% this identity equal -imag(F_Og)' and -imag(F_gg)' respectively -- NOT
+% +imag(F_Og)'/+imag(F_gg)' as a naive transcription would suggest. This
+% sign is what guarantees F is exactly (not just numerically-forced)
+% symmetric, hence a valid PSD Fisher Information Matrix.
 %
 % NOTE on dimension d: in the paper d = 3 (full 3D angle). Here d = numDim
 % (Remark 1 reduction: 1 for linear, 2 for planar, 3 for cubic arrays),
@@ -27,8 +36,8 @@ function F = compute_FIM(Atr, Adot_tr, Rs, Nr, gamma, sigma2, numDim, K)
 % OUTPUT
 %   F - ((numDim+2)*K x (numDim+2)*K) real Fisher Information Matrix
 %
-% Author:Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     R = kron(Rs, eye(Nr)); % (Nt*Nr x Nt*Nr), matches Atr's [Tx-slow, Rx-fast] ordering
 
@@ -46,7 +55,7 @@ function F = compute_FIM(Atr, Adot_tr, Rs, Nr, gamma, sigma2, numDim, K)
 
     top    = [real(F_OO),   real(F_Og),  -imag(F_Og)];
     middle = [real(F_Og)',  real(F_gg),  -imag(F_gg)];
-    bottom = [imag(F_Og)',  imag(F_gg)',  real(F_gg)];
+    bottom = [-imag(F_Og)', -imag(F_gg)',  real(F_gg)];
 
     F = (2/sigma2) * [top; middle; bottom];                         % eq. (4)
     F = (F + F')/2; % enforce exact symmetry (numerical hygiene)

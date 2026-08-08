@@ -30,8 +30,8 @@ function Rs = coherent_waveform(At, targetSet)
 % OUTPUT
 %   Rs - (Nt x Nt) transmit covariance, tr(Rs) = 1
 %
-% Author:Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     [Nt, K] = size(At);
     if nargin < 2 || isempty(targetSet)

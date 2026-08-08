@@ -9,8 +9,8 @@ function C = khatri_rao(A, B)
 % OUTPUT
 %   C - (Nt*Nr x K), C(:,k) = kron(A(:,k), B(:,k))
 %
-% Author: Ali Arabi Bavil
-% Date: 2026-07
+% Author: Ali ArabiBavil
+% Date: 2026-07-07
 
     [Nt, K]  = size(A);
     [Nr, K2] = size(B);
