@@ -419,7 +419,7 @@ DOI: [10.1109/IEEECONF67917.2025.11443763](https://doi.org/10.1109/IEEECONF67917
 
 ```bibtex
 @software{crb_array_waveform_matlab_repro,
-  author  = {[نام شما]},
+  author  = {Ali ArabiBavil},
   title   = {CRB-Optimal Arrays and Waveforms for Multi-Target Active Sensing: An Independent MATLAB Reproduction},
   year    = {[سال]},
   url     = {[آدرس مخزن]},
