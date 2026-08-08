@@ -1,0 +1,228 @@
+function [W_ssp, R_ssp, converged] = ssp_baseline(H, Gamma_linear, R0, params)
+%SSP_BASELINE  Sum-square-penalty DFRC baseline of reference [42].
+%
+%   [W_ssp, R_ssp, converged] = SSP_BASELINE(H, Gamma_linear, R0, params)
+%
+%   ASSUMPTION / DOCUMENTED GAP: this paper (arXiv:1912.03420) describes
+%   the SSP baseline only at a high level -- "we use gradient projection
+%   method to solve the sum-square-penalty (SSP) problem under
+%   per-antenna constraint in [42]. In the sum-square penalty problem in
+%   [42], the weighing factors are rho1=1, rho2=2 and the given SINR at
+%   each user is equal to the SINR threshold Gamma" -- and states the
+%   radar loss used there is ||R - R0||_F^2 (Section V-C). The exact
+%   gradient-projection step-size schedule and stopping rule of [42] are
+%   NOT given in this paper. We therefore implement our own, clearly
+%   documented, smooth penalized objective and projected-gradient solver
+%   that matches every detail the paper DOES specify:
+%
+%       f(Wc) = rho1*||Wc*Wc^H - R0||_F^2
+%               + rho2 * sum_k max(0, Gamma - gamma_k(Wc))^2
+%
+%       s.t. [Wc*Wc^H]_{m,m} = Pt/M  for all m   (per-antenna constraint)
+%
+%   with Wr == 0 (only communication symbols are precoded, matching the
+%   paper's description of [42] as precoding only Wc).
+%
+%   Gradient (Wirtinger calculus, derived and documented below) is used
+%   for an efficient analytic projected-gradient-descent solver, with a
+%   simple backtracking (halving) step-size rule and a fixed iteration
+%   cap -- our choice, not from the paper (see params.ssp_max_iter,
+%   params.ssp_tol, params.ssp_step0 in config/parameters.m).
+%
+%   Inputs:
+%     H            - K x M downlink channel matrix
+%     Gamma_linear - scalar SINR threshold, LINEAR (not dB)
+%     R0           - M x M radar-only optimal covariance (from eq. 15)
+%     params       - struct from config/parameters.m
+%
+%   Outputs:
+%     W_ssp     - M x (M+K) precoder [Wc, 0_{MxM}] (radar part is zero)
+%     R_ssp     - M x M covariance Wc*Wc^H
+%     converged - logical, true if stopping tolerance was reached before
+%                 hitting the iteration cap
+%
+%   Author: Ali Arabi Bavil
+%   Date:   2026
+
+M   = params.M;
+Pt  = params.Pt;
+sigma2 = params.sigma2;
+rho1 = params.ssp_rho1;
+rho2 = params.ssp_rho2;
+max_iter = params.ssp_max_iter;
+tol      = params.ssp_tol;
+step     = params.ssp_step0;
+K = size(H,1);
+
+% --- Initialization: random Wc satisfying the per-antenna constraint ---
+Wc = (randn(M,K) + 1j*randn(M,K)) / sqrt(2);
+Wc = project_per_antenna(Wc, Pt, M);
+
+f_prev = ssp_objective(Wc, H, R0, sigma2, Gamma_linear, rho1, rho2);
+converged = false;
+
+for iter = 1:max_iter
+    Grad = ssp_gradient(Wc, H, R0, sigma2, Gamma_linear, rho1, rho2);
+    gnorm = norm(Grad, 'fro');
+    if gnorm < tol
+        converged = true;
+        break;
+    end
+
+    % Backtracking line search (simple halving rule; our choice)
+    step_try = step;
+    for bt = 1:20
+        Wc_new = project_per_antenna(Wc - step_try * Grad, Pt, M);
+        f_new = ssp_objective(Wc_new, H, R0, sigma2, Gamma_linear, rho1, rho2);
+        if f_new <= f_prev
+            break;
+        end
+        step_try = step_try / 2;
+    end
+
+    if abs(f_prev - f_new) < tol * max(1, abs(f_prev))
+        Wc = Wc_new;
+        converged = true;
+        break;
+    end
+
+    Wc = Wc_new;
+    f_prev = f_new;
+end
+
+R_ssp = Wc * Wc';
+W_ssp = [Wc, zeros(M,M)]; % Wr = 0, matching [42]'s comm-only precoding
+
+end
+
+% =========================================================================
+function f = ssp_objective(Wc, H, R0, sigma2, Gamma, rho1, rho2)
+%SSP_OBJECTIVE  f(Wc) = rho1*||WcWc^H-R0||_F^2 + rho2*sum_k penalty_k
+%
+%   NOTE: the SINR penalty is normalized by Gamma (relative gap, not
+%   absolute) so its scale is comparable to the radar term regardless of
+%   the SINR threshold's magnitude -- without this, at high Gamma the
+%   SINR term dominates by orders of magnitude and the optimizer never
+%   meaningfully shapes the radar beam pattern. This normalization is
+%   our own choice (see file header on SSP baseline assumptions).
+R = Wc * Wc';
+term1 = rho1 * norm(R - R0, 'fro')^2;
+
+F = H * Wc; % K x K
+K_ = size(F,1);
+term2 = 0;
+for k = 1:K_
+    Nk = abs(F(k,k))^2;
+    Dk = sum(abs(F(k, [1:k-1, k+1:K_])).^2) + sigma2;
+    gamma_k = Nk / Dk;
+    e_k = (Gamma - gamma_k) / Gamma; % relative gap
+    if e_k > 0
+        term2 = term2 + e_k^2;
+    end
+end
+f = term1 + rho2 * term2;
+end
+
+% =========================================================================
+function Grad = ssp_gradient(Wc, H, R0, sigma2, Gamma, rho1, rho2)
+%SSP_GRADIENT  Analytic Wirtinger-calculus gradient of ssp_objective wrt Wc*.
+R = Wc * Wc';
+Grad1 = 2 * rho1 * (R - R0) * Wc;
+
+F = H * Wc; % K x K
+K_ = size(F,1);
+Grad_F = zeros(K_, K_);
+
+for k = 1:K_
+    idx_off = [1:k-1, k+1:K_];
+    Nk = abs(F(k,k))^2;
+    Dk = sum(abs(F(k, idx_off)).^2) + sigma2;
+    gamma_k = Nk / Dk;
+    e_k = (Gamma - gamma_k) / Gamma; % relative gap, matches ssp_objective
+    if e_k > 0
+        % chain rule picks up an extra 1/Gamma factor vs. before, since
+        % e_k is now (Gamma-gamma_k)/Gamma instead of (Gamma-gamma_k)
+        Grad_F(k,k) = -2 * e_k * F(k,k) / (Dk * Gamma);
+        Grad_F(k, idx_off) = 2 * e_k * gamma_k * F(k, idx_off) / (Dk * Gamma);
+    end
+end
+
+Grad2 = H' * Grad_F;
+Grad = Grad1 + rho2 * Grad2;
+end
+
+function f = ssp_objective(Wc, H, R0, sigma2, Gamma, rho1, rho2)
+%SSP_OBJECTIVE  f(Wc) = rho1*||WcWc^H-R0||_F^2 + rho2*sum_k penalty_k
+R = Wc * Wc';
+term1 = rho1 * norm(R - R0, 'fro')^2;
+
+F = H * Wc; % K x K
+K_ = size(F,1);
+term2 = 0;
+for k = 1:K_
+    Nk = abs(F(k,k))^2;
+    Dk = sum(abs(F(k,[1:k-1,k+1:end]))).^2; %#ok<NASGU>
+    Dk = sum(abs(F(k, [1:k-1, k+1:K_])).^2) + sigma2;
+    gamma_k = Nk / Dk;
+    e_k = Gamma - gamma_k;
+    if e_k > 0
+        term2 = term2 + e_k^2;
+    end
+end
+f = term1 + rho2 * term2;
+end
+
+% =========================================================================
+function Grad = ssp_gradient(Wc, H, R0, sigma2, Gamma, rho1, rho2)
+%SSP_GRADIENT  Analytic Wirtinger-calculus gradient of ssp_objective wrt Wc*.
+%
+%   Term 1: d/dWc* rho1*||WcWc^H-R0||_F^2 = 2*rho1*(WcWc^H-R0)*Wc
+%   Term 2: propagated through F=H*Wc via chain rule, see module header
+%           for full derivation of dgamma_k/dF(k,i)*.
+R = Wc * Wc';
+Grad1 = 2 * rho1 * (R - R0) * Wc;
+
+F = H * Wc; % K x K
+K_ = size(F,1);
+Grad_F = zeros(K_, K_);
+
+for k = 1:K_
+    idx_off = [1:k-1, k+1:K_];
+    Nk = abs(F(k,k))^2;
+    Dk = sum(abs(F(k, idx_off)).^2) + sigma2;
+    gamma_k = Nk / Dk;
+    e_k = Gamma - gamma_k;
+    if e_k > 0
+        % d g_k / dF(k,k)*  = -2*e_k*F(k,k)/Dk
+        Grad_F(k,k) = -2 * e_k * F(k,k) / Dk;
+        % d g_k / dF(k,i)* = 2*e_k*gamma_k*F(k,i)/Dk, i ~= k
+        Grad_F(k, idx_off) = 2 * e_k * gamma_k * F(k, idx_off) / Dk;
+    end
+end
+
+Grad2 = H' * Grad_F; % M x K, chain rule through linear map F = H*Wc
+
+Grad = Grad1 + rho2 * Grad2;
+end
+
+% =========================================================================
+function Wc_proj = project_per_antenna(Wc, Pt, M)
+%PROJECT_PER_ANTENNA  Row-wise rescaling to enforce [WcWc^H]_{m,m}=Pt/M.
+%
+%   This is an exact projection: since each row's power depends only on
+%   that row, scaling row m by a positive real factor exactly fixes that
+%   row's power without affecting other rows -- our chosen heuristic
+%   projection (not from the paper) for the per-antenna constraint.
+Wc_proj = Wc;
+target = Pt / M;
+for m = 1:M
+    row_power = sum(abs(Wc(m,:)).^2);
+    if row_power > 0
+        Wc_proj(m,:) = Wc(m,:) * sqrt(target / row_power);
+    else
+        % Degenerate all-zero row: seed with a small random vector
+        v = (randn(1,size(Wc,2)) + 1j*randn(1,size(Wc,2)));
+        Wc_proj(m,:) = v * sqrt(target / sum(abs(v).^2));
+    end
+end
+end
